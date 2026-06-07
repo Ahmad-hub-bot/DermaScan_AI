@@ -169,9 +169,35 @@ def run_inference(img_np):
     heatmap = show_cam_on_image(img_float, grayscale_cam[0], use_rgb=True)
     return pred_name, pred_conf, probs_8, heatmap
 
-def show_results(pred_name, pred_conf, probs_8, heatmap, original_img):
+def show_results(pred_name, pred_conf, probs_8, heatmap, original_img, patient=None):
     risk_level, risk_msg, risk_color, risk_bg = RISK[pred_name]
     risk_icon = RISK_ICON[risk_level]
+
+    # Patient info card
+    if patient and any(patient.values()):
+        age_risk = ""
+        if patient.get("age"):
+            if patient["age"] > 50:
+                age_risk = " · <span style='color:#854F0B'>Age >50 increases melanoma risk</span>"
+            elif patient["age"] < 20:
+                age_risk = " · <span style='color:#3B6D11'>Young age — lower risk profile</span>"
+        gender_note = ""
+        if patient.get("gender") == "Male":
+            gender_note = " · Higher BCC/SCC risk in males"
+        elif patient.get("gender") == "Female":
+            gender_note = " · Higher melanoma risk in females under 50"
+        st.markdown(f"""
+        <div class="result-card" style="margin-bottom:1rem">
+            <div class="section-head">Patient Details</div>
+            <div style="display:flex; gap:2rem; flex-wrap:wrap; font-size:0.9rem; color:#374151">
+                {f'<div>👤 <strong>{patient["name"]}</strong></div>' if patient.get("name") else ""}
+                {f'<div>🎂 Age: <strong>{patient["age"]}</strong>{age_risk}</div>' if patient.get("age") else ""}
+                {f'<div>⚧ Gender: <strong>{patient["gender"]}</strong>{gender_note}</div>' if patient.get("gender") else ""}
+                {f'<div>📍 Lesion location: <strong>{patient["location"]}</strong></div>' if patient.get("location") else ""}
+                {f'<div>⏱ Duration: <strong>{patient["duration"]}</strong></div>' if patient.get("duration") else ""}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2, gap="medium")
     with col1:
@@ -244,9 +270,71 @@ def show_results(pred_name, pred_conf, probs_8, heatmap, original_img):
     </div>
     """, unsafe_allow_html=True)
 
+def check_and_show(image, img_np, threshold):
+    with st.spinner("🔬 Analysing image..."):
+        pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
+    if pred_conf < threshold:
+        st.markdown(f"""
+        <div style="background:#EAF3DE; border-left:4px solid #3B6D11; border-radius:0 12px 12px 0;
+                    padding:1.25rem 1.5rem; margin-top:1.5rem;">
+            <div style="font-size:1.8rem; margin-bottom:0.4rem">✅</div>
+            <div style="font-weight:600; font-size:1.1rem; color:#27500A;">No significant lesion detected</div>
+            <div style="font-size:0.9rem; color:#3B6D11; margin-top:0.3rem;">
+                Confidence too low ({pred_conf:.1%}) — no reliable diagnosis can be made.<br>
+                This usually means the image does not show a visible skin lesion,
+                or is not a close-up dermoscopy image.<br><br>
+                <strong>Tip:</strong> For best results, take a close-up photo of the lesion in good lighting.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        show_results(pred_name, pred_conf, probs_8, heatmap, image, patient=st.session_state.get("patient"))
+
+# ── Patient Info Form ────────────────────────────────────────────────────────
+st.markdown('<div class="section-head">Patient Information</div>', unsafe_allow_html=True)
+with st.expander("👤 Enter Patient Details (optional but recommended)", expanded=True):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        p_name = st.text_input("Full Name", placeholder="e.g. Ahmad Al-Rashid")
+        p_gender = st.selectbox("Gender", ["", "Male", "Female", "Prefer not to say"])
+    with col2:
+        p_age = st.number_input("Age", min_value=0, max_value=120, value=0, step=1)
+        p_location = st.selectbox("Lesion Location", [
+            "", "Face", "Neck", "Scalp", "Chest", "Back",
+            "Abdomen", "Arm", "Hand", "Leg", "Foot", "Other"
+        ])
+    with col3:
+        p_duration = st.selectbox("How long have you had it?", [
+            "", "Less than 1 month", "1–3 months", "3–6 months",
+            "6–12 months", "More than 1 year", "Unknown"
+        ])
+        p_change = st.selectbox("Has it changed recently?", [
+            "", "No change", "Growing", "Colour change", "Bleeding/itching", "Unsure"
+        ])
+
+    st.session_state["patient"] = {
+        "name": p_name.strip() if p_name else None,
+        "age": int(p_age) if p_age > 0 else None,
+        "gender": p_gender if p_gender else None,
+        "location": p_location if p_location else None,
+        "duration": p_duration if p_duration else None,
+        "change": p_change if p_change else None,
+    }
+
+st.markdown("---")
+
 # ── Mode selector ─────────────────────────────────────────────────────────────
 st.markdown('<div class="section-head">Choose Input Method</div>', unsafe_allow_html=True)
 mode = st.radio("", ["📁  Upload Image", "📷  Live Camera"], horizontal=True, label_visibility="collapsed")
+
+with st.expander("⚙️ Advanced Settings"):
+    threshold = st.slider(
+        "Confidence threshold — below this shows 'No lesion detected'",
+        min_value=0.40, max_value=0.85, value=0.60, step=0.05,
+        format="%.0f%%"
+    )
+    st.caption("🔵 Lower = more sensitive · 🔴 Higher = more strict · Recommended: 60%")
+
 st.markdown("---")
 
 if mode == "📁  Upload Image":
@@ -254,9 +342,7 @@ if mode == "📁  Upload Image":
     if uploaded:
         image = Image.open(uploaded).convert("RGB")
         img_np = np.array(image)
-        with st.spinner("🔬 Analysing image..."):
-            pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
-        show_results(pred_name, pred_conf, probs_8, heatmap, image)
+        check_and_show(image, img_np, threshold)
 
 else:
     st.markdown("""
@@ -270,6 +356,4 @@ else:
     if photo is not None:
         image = Image.open(photo).convert("RGB")
         img_np = np.array(image)
-        with st.spinner("🔬 Analysing captured photo..."):
-            pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
-        show_results(pred_name, pred_conf, probs_8, heatmap, image)
+        check_and_show(image, img_np, threshold)
