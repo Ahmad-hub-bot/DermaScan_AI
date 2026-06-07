@@ -151,8 +151,11 @@ transform = A.Compose([
 ])
 
 def run_inference(img_np):
+    import cv2 as cv
     model, cam = load_model()
-    img_float = img_np.astype(np.float32) / 255.0
+    # Resize to 224x224 for both the model input and Grad-CAM overlay
+    img_resized = cv.resize(img_np, (224, 224))
+    img_float = img_resized.astype(np.float32) / 255.0
     tensor = transform(image=img_np)["image"].unsqueeze(0)
     with torch.no_grad():
         output = model(tensor)
@@ -162,6 +165,7 @@ def run_inference(img_np):
     pred_name = CLASS_NAMES[pred_idx]
     pred_conf = probs_8[pred_idx]
     grayscale_cam = cam(input_tensor=tensor)
+    # grayscale_cam[0] is (224,224), img_float is now also (224,224,3) — sizes match
     heatmap = show_cam_on_image(img_float, grayscale_cam[0], use_rgb=True)
     return pred_name, pred_conf, probs_8, heatmap
 
