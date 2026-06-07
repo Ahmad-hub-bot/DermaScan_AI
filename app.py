@@ -7,9 +7,6 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
-import av
-import cv2
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 CLASS_NAMES = ["MEL","NV","BCC","AK","BKL","DF","VASC","SCC"]
 FULL_NAMES  = {
@@ -29,10 +26,6 @@ RISK = {
     "DF" :("LOW RISK","Routine monitoring advised","#3B6D11","#EAF3DE"),
 }
 RISK_ICON = {"HIGH RISK":"⛔","MODERATE RISK":"⚠️","LOW RISK":"✅"}
-
-RTC_CONFIGURATION = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-)
 
 st.set_page_config(page_title="DermaScan AI", page_icon="🔬", layout="wide")
 
@@ -114,7 +107,7 @@ div[data-testid="stButton"] > button:hover { background: #0F6E56 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# Hero
+# ── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero">
     <div class="hero-badge">AI · EfficientNet-B3 · Grad-CAM XAI</div>
@@ -127,6 +120,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Model ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     m = timm.create_model("efficientnet_b3", pretrained=False, num_classes=9)
@@ -232,11 +226,12 @@ def show_results(pred_name, pred_conf, probs_8, heatmap, original_img):
     </div>
     """, unsafe_allow_html=True)
 
-# Mode selector
+# ── Mode selector ─────────────────────────────────────────────────────────────
 st.markdown('<div class="section-head">Choose Input Method</div>', unsafe_allow_html=True)
 mode = st.radio("", ["📁  Upload Image", "📷  Live Camera"], horizontal=True, label_visibility="collapsed")
 st.markdown("---")
 
+# ── Upload mode ───────────────────────────────────────────────────────────────
 if mode == "📁  Upload Image":
     uploaded = st.file_uploader("Drag & drop a dermoscopy image (JPG, JPEG, PNG)", type=["jpg","jpeg","png"])
     if uploaded:
@@ -246,51 +241,21 @@ if mode == "📁  Upload Image":
             pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
         show_results(pred_name, pred_conf, probs_8, heatmap, image)
 
+# ── Live Camera mode ──────────────────────────────────────────────────────────
 else:
     st.markdown("""
     <div class="camera-tip">
-        📷 <strong>Live camera</strong> — Point at the skin lesion, centre it inside the green targeting box, then click <strong>Capture & Analyse</strong>.
+        📷 <strong>Live camera</strong> — Allow camera access when prompted, point at the skin lesion,
+        then click <strong>Take Photo</strong>. The AI will analyse it instantly.
     </div>
     """, unsafe_allow_html=True)
 
-    if "camera_frame" not in st.session_state:
-        st.session_state.camera_frame = None
+    # st.camera_input is Streamlit's native camera — reliable on all devices & Streamlit Cloud
+    photo = st.camera_input("Take a photo of the lesion")
 
-    class FrameCapture(VideoProcessorBase):
-        def __init__(self):
-            self.frame = None
-        def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-            img = frame.to_ndarray(format="bgr24")
-            self.frame = img
-            h, w = img.shape[:2]
-            cx, cy = w // 2, h // 2
-            size = min(h, w) // 3
-            cv2.rectangle(img, (cx-size, cy-size), (cx+size, cy+size), (29,158,117), 2)
-            cv2.putText(img, "Centre lesion here", (cx-size, cy-size-12),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (29,158,117), 2)
-            return av.VideoFrame.from_ndarray(img, format="bgr24")
-
-    ctx = webrtc_streamer(
-        key="dermascan-camera",
-        video_processor_factory=FrameCapture,
-        rtc_configuration=RTC_CONFIGURATION,
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
-
-    if ctx.video_processor:
-        if st.button("📸 Capture & Analyse"):
-            frame = ctx.video_processor.frame
-            if frame is not None:
-                img_np = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                st.session_state.camera_frame = img_np
-                st.success("✅ Frame captured! Running analysis...")
-            else:
-                st.warning("⚠️ No frame captured — make sure the camera is running.")
-
-    if st.session_state.camera_frame is not None:
-        img_np = st.session_state.camera_frame
-        image  = Image.fromarray(img_np)
-        with st.spinner("🔬 Analysing captured frame..."):
+    if photo is not None:
+        image = Image.open(photo).convert("RGB")
+        img_np = np.array(image)
+        with st.spinner("🔬 Analysing captured photo..."):
             pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
         show_results(pred_name, pred_conf, probs_8, heatmap, image)
