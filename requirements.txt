@@ -4,5 +4,3 @@ albumentations
 grad-cam
 streamlit
 opencv-python-headless
-streamlit-webrtc
-av
