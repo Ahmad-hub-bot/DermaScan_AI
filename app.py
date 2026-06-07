@@ -344,6 +344,43 @@ st.markdown('<div class="section-head">Choose Input Method</div>', unsafe_allow_
 mode = st.radio("", ["📁  Upload Image", "📷  Live Camera"], horizontal=True, label_visibility="collapsed")
 st.markdown("---")
 
+# ── Tips banner ───────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:14px;
+            padding:1rem 1.25rem; margin-bottom:1.25rem;">
+    <div style="font-weight:600; color:#0369a1; margin-bottom:0.5rem;">📌 For best results — please read before scanning</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 1.5rem; font-size:0.85rem; color:#374151;">
+        <div>✅ Use a <strong>close-up photo</strong> of the lesion</div>
+        <div>✅ Ensure <strong>good lighting</strong> — natural light is best</div>
+        <div>✅ The lesion should <strong>fill most of the frame</strong></div>
+        <div>✅ Keep the camera <strong>steady and in focus</strong></div>
+        <div>❌ Avoid <strong>flash glare</strong> or shadows on the skin</div>
+        <div>❌ This model was trained on <strong>dermoscopy images</strong> — regular phone photos may reduce confidence</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Persistent tip shown for both modes
+st.markdown("""
+<div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px;
+            padding:1rem 1.25rem; margin-bottom:1.25rem; font-size:0.88rem; color:#0c4a6e;">
+    <strong>📌 Important — For best results:</strong><br>
+    This model was trained on <strong>professional dermoscopy images</strong> taken with a specialised skin camera (dermoscope).
+    A dermoscope eliminates surface glare and reveals subsurface lesion structures invisible to the naked eye.
+    <strong>Ideally, use a dermoscopic image for the most accurate result.</strong>
+    Regular phone photos may reduce confidence scores even when a lesion is clearly visible.
+    <br><br>
+    If you are using a phone camera, follow these tips:
+    <ul style="margin:0.5rem 0 0 0; padding-left:1.2rem; line-height:1.9">
+        <li>🔬 <strong>Best:</strong> Use a dermoscopy image from a clinic or a smartphone dermoscope attachment</li>
+        <li>📸 <strong>Otherwise:</strong> Take a close-up photo — lesion should fill most of the frame</li>
+        <li>💡 Use <strong>good, even lighting</strong> — avoid flash glare or shadows</li>
+        <li>🎯 Keep the camera <strong>steady and in focus</strong></li>
+        <li>🚫 Avoid filters, zoom, or portrait mode — use standard camera only</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
+
 if mode == "📁  Upload Image":
     uploaded = st.file_uploader("Drag & drop a dermoscopy image (JPG, JPEG, PNG)", type=["jpg","jpeg","png"])
     if uploaded:
