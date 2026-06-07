@@ -311,7 +311,7 @@ st.markdown('<div class="section-head">Patient Information</div>', unsafe_allow_
 with st.expander("👤 Enter Patient Details (optional but recommended)", expanded=True):
     col1, col2, col3 = st.columns(3)
     with col1:
-        p_name = st.text_input("Full Name", placeholder="e.g. Ahmed Abd Ur Reham")
+        p_name = st.text_input("Full Name", placeholder="e.g. Ahmed Abd Ur R")
         p_gender = st.selectbox("Gender", ["", "Male", "Female", "Prefer not to say"])
     with col2:
         p_age = st.number_input("Age", min_value=0, max_value=120, value=0, step=1)
