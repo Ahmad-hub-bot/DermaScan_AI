@@ -7,6 +7,8 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
+import os
+import gdown
 
 CLASS_NAMES = ["MEL","NV","BCC","AK","BKL","DF","VASC","SCC"]
 FULL_NAMES  = {
@@ -26,6 +28,15 @@ RISK = {
     "DF" :("LOW RISK","Routine monitoring advised","#3B6D11","#EAF3DE"),
 }
 RISK_ICON = {"HIGH RISK":"⛔","MODERATE RISK":"⚠️","LOW RISK":"✅"}
+
+MODEL_PATH = "best_model.pth"
+GDRIVE_ID  = "1eNwqylZ_xQbc74Xx44j5WoRI7H1j9AVY"
+
+def download_model():
+    if not os.path.exists(MODEL_PATH):
+        with st.spinner("⏳ Downloading model on first run... (this may take a minute)"):
+            gdown.download(id=GDRIVE_ID, output=MODEL_PATH, quiet=False)
+        st.success("✅ Model downloaded successfully!")
 
 st.set_page_config(page_title="DermaScan AI", page_icon="🔬", layout="wide")
 
@@ -120,11 +131,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Download model if missing ─────────────────────────────────────────────────
+download_model()
+
 # ── Model ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     m = timm.create_model("efficientnet_b3", pretrained=False, num_classes=9)
-    ckpt = torch.load("best_model.pth", map_location="cpu")
+    ckpt = torch.load(MODEL_PATH, map_location="cpu")
     m.load_state_dict(ckpt["model_state_dict"])
     m.eval()
     cam = GradCAM(model=m, target_layers=[m.conv_head])
@@ -231,7 +245,6 @@ st.markdown('<div class="section-head">Choose Input Method</div>', unsafe_allow_
 mode = st.radio("", ["📁  Upload Image", "📷  Live Camera"], horizontal=True, label_visibility="collapsed")
 st.markdown("---")
 
-# ── Upload mode ───────────────────────────────────────────────────────────────
 if mode == "📁  Upload Image":
     uploaded = st.file_uploader("Drag & drop a dermoscopy image (JPG, JPEG, PNG)", type=["jpg","jpeg","png"])
     if uploaded:
@@ -241,7 +254,6 @@ if mode == "📁  Upload Image":
             pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
         show_results(pred_name, pred_conf, probs_8, heatmap, image)
 
-# ── Live Camera mode ──────────────────────────────────────────────────────────
 else:
     st.markdown("""
     <div class="camera-tip">
@@ -250,9 +262,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-    # st.camera_input is Streamlit's native camera — reliable on all devices & Streamlit Cloud
     photo = st.camera_input("Take a photo of the lesion")
-
     if photo is not None:
         image = Image.open(photo).convert("RGB")
         img_np = np.array(image)
