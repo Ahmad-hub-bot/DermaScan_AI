@@ -270,27 +270,43 @@ def show_results(pred_name, pred_conf, probs_8, heatmap, original_img, patient=N
     </div>
     """, unsafe_allow_html=True)
 
-def check_and_show(image, img_np, threshold):
-    with st.spinner("🔬 Analysing image..."):
-        pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
-    if pred_conf < threshold:
+def confidence_banner(pred_conf):
+    if pred_conf >= 0.70:
+        return
+    elif pred_conf >= 0.50:
         st.markdown(f"""
-        <div style="background:#EAF3DE; border-left:4px solid #3B6D11; border-radius:0 12px 12px 0;
-                    padding:1.25rem 1.5rem; margin-top:1.5rem;">
-            <div style="font-size:1.8rem; margin-bottom:0.4rem">✅</div>
-            <div style="font-weight:600; font-size:1.1rem; color:#27500A;">No significant lesion detected</div>
-            <div style="font-size:0.9rem; color:#3B6D11; margin-top:0.3rem;">
-                Confidence too low ({pred_conf:.1%}) — no reliable diagnosis can be made.<br>
-                This usually means the image does not show a visible skin lesion,
-                or is not a close-up dermoscopy image.<br><br>
-                <strong>Tip:</strong> For best results, take a close-up photo of the lesion in good lighting.
-            </div>
+        <div style="background:#FAEEDA; border-left:4px solid #BA7517; border-radius:0 12px 12px 0;
+                    padding:1rem 1.25rem; margin-bottom:1rem; font-size:0.88rem; color:#633806;">
+            <strong>⚠️ Moderate confidence ({pred_conf:.1%})</strong> — The model has some uncertainty.
+            This image may not be a close-up clinical dermoscopy photo.
+            Consider consulting a dermatologist to confirm this result.
+        </div>
+        """, unsafe_allow_html=True)
+    elif pred_conf >= 0.30:
+        st.markdown(f"""
+        <div style="background:#FAEEDA; border-left:4px solid #E24B4A; border-radius:0 12px 12px 0;
+                    padding:1rem 1.25rem; margin-bottom:1rem; font-size:0.88rem; color:#A32D2D;">
+            <strong>🔴 Low confidence ({pred_conf:.1%})</strong> — The model is uncertain about this image.
+            It may not be a dermoscopy image, or lighting/angle may be affecting accuracy.
+            The prediction below is shown for reference only — <strong>please consult a dermatologist.</strong>
         </div>
         """, unsafe_allow_html=True)
     else:
-        show_results(pred_name, pred_conf, probs_8, heatmap, image, patient=st.session_state.get("patient"))
+        st.markdown(f"""
+        <div style="background:#FCEBEB; border-left:4px solid #E24B4A; border-radius:0 12px 12px 0;
+                    padding:1rem 1.25rem; margin-bottom:1rem; font-size:0.88rem; color:#A32D2D;">
+            <strong>❌ Very low confidence ({pred_conf:.1%})</strong> — Image quality is too low for reliable analysis.
+            Please retake closer to the lesion with better lighting, or use a dermoscopy image.
+        </div>
+        """, unsafe_allow_html=True)
 
-# ── Patient Info Form ────────────────────────────────────────────────────────
+def check_and_show(image, img_np):
+    with st.spinner("🔬 Analysing image..."):
+        pred_name, pred_conf, probs_8, heatmap = run_inference(img_np)
+    confidence_banner(pred_conf)
+    show_results(pred_name, pred_conf, probs_8, heatmap, image, patient=st.session_state.get("patient"))
+
+# ── Patient Info Form ─────────────────────────────────────────────────────────
 st.markdown('<div class="section-head">Patient Information</div>', unsafe_allow_html=True)
 with st.expander("👤 Enter Patient Details (optional but recommended)", expanded=True):
     col1, col2, col3 = st.columns(3)
@@ -305,8 +321,8 @@ with st.expander("👤 Enter Patient Details (optional but recommended)", expand
         ])
     with col3:
         p_duration = st.selectbox("How long have you had it?", [
-            "", "Less than 1 month", "1–3 months", "3–6 months",
-            "6–12 months", "More than 1 year", "Unknown"
+            "", "Less than 1 month", "1-3 months", "3-6 months",
+            "6-12 months", "More than 1 year", "Unknown"
         ])
         p_change = st.selectbox("Has it changed recently?", [
             "", "No change", "Growing", "Colour change", "Bleeding/itching", "Unsure"
@@ -326,15 +342,6 @@ st.markdown("---")
 # ── Mode selector ─────────────────────────────────────────────────────────────
 st.markdown('<div class="section-head">Choose Input Method</div>', unsafe_allow_html=True)
 mode = st.radio("", ["📁  Upload Image", "📷  Live Camera"], horizontal=True, label_visibility="collapsed")
-
-with st.expander("⚙️ Advanced Settings"):
-    threshold = st.slider(
-        "Confidence threshold — below this shows 'No lesion detected'",
-        min_value=0.40, max_value=0.85, value=0.60, step=0.05,
-        format="%.0f%%"
-    )
-    st.caption("🔵 Lower = more sensitive · 🔴 Higher = more strict · Recommended: 60%")
-
 st.markdown("---")
 
 if mode == "📁  Upload Image":
@@ -342,7 +349,7 @@ if mode == "📁  Upload Image":
     if uploaded:
         image = Image.open(uploaded).convert("RGB")
         img_np = np.array(image)
-        check_and_show(image, img_np, threshold)
+        check_and_show(image, img_np)
 
 else:
     st.markdown("""
@@ -356,4 +363,4 @@ else:
     if photo is not None:
         image = Image.open(photo).convert("RGB")
         img_np = np.array(image)
-        check_and_show(image, img_np, threshold)
+        check_and_show(image, img_np)
