@@ -4,3 +4,4 @@ albumentations
 grad-cam
 streamlit
 opencv-python-headless
+gdown
