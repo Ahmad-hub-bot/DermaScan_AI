@@ -1,0 +1,6 @@
+torch
+timm
+albumentations
+grad-cam
+streamlit
+opencv-python-headless
