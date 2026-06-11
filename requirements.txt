@@ -2,7 +2,7 @@ torch
 torchvision
 timm
 albumentations
-pytorch-grad-cam
+grad-cam
 streamlit
 opencv-python-headless
 gdown
